@@ -7,8 +7,8 @@ module YamlDb
       attr_reader :extension
 
       def initialize(helper)
-        @dumper    = helper.dumper
-        @loader    = helper.loader
+        @dumper = helper.dumper
+        @loader = helper.loader
         @extension = helper.extension
       end
 
@@ -86,14 +86,29 @@ module YamlDb
           return
         end
 
-        table_class = table.camelize.constantize
+
+        table_class = table.singularize.camelize
+
+        name_spaces = ['Amcas']
+
+        if name_spaces
+          name_spaces.each do |name_space|
+            if table_class.starts_with? name_space
+              table_class = "#{name_space}::#{table_class[name_space.length, table_class.length]}"
+            end
+          end
+        end
+
+        table_class = table_class.constantize
+
         records.each do |record|
           insert_hash = {}
-          column_names.each_with_index { |column, index| column } do
-            insert_hash[column.to_s] = column_names[index]
-          end
+          column_names.each_with_index { |column, index|
+            insert_hash[column.to_s] = record[index]
+          }
 
-          table_class.create insert_hash
+          s = table_class.new(insert_hash).save!(validate: false)
+
         end
       end
 
@@ -184,14 +199,14 @@ module YamlDb
       end
 
 
-      def self.each_table_page(table, records_per_page=1000)
+      def self.each_table_page(table, records_per_page = 1000)
         total_count = table_record_count(table)
         pages = (total_count.to_f / records_per_page).ceil - 1
         keys = sort_keys(table)
         boolean_columns = Utils.boolean_columns(table)
 
         (0..pages).to_a.each do |page|
-          query = Arel::Table.new(table).order(*keys).skip(records_per_page*page).take(records_per_page).project(Arel.sql('*'))
+          query = Arel::Table.new(table).order(*keys).skip(records_per_page * page).take(records_per_page).project(Arel.sql('*'))
           records = ActiveRecord::Base.connection.select_all(query.to_sql)
           records = Utils.convert_booleans(records, boolean_columns)
           yield records
