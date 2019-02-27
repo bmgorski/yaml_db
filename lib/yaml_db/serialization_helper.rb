@@ -85,11 +85,15 @@ module YamlDb
         if column_names.nil?
           return
         end
-        quoted_column_names = column_names.map { |column| ActiveRecord::Base.connection.quote_column_name(column) }.join(',')
-        quoted_table_name = Utils.quote_table(table)
+
+        table_class = table.camelize.constantize
         records.each do |record|
-          quoted_values = record.map{|c| ActiveRecord::Base.connection.quote(c)}.join(',')
-          ActiveRecord::Base.connection.execute("INSERT INTO #{quoted_table_name} (#{quoted_column_names}) VALUES (#{quoted_values})")
+          insert_hash = {}
+          column_names.each_with_index { |column, index| column } do
+            insert_hash[column.to_s] = column_names[index]
+          end
+
+          table_class.create insert_hash
         end
       end
 
